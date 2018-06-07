@@ -1,8 +1,43 @@
+import copy
+import cv2
 import os
 import scipy
 import numpy as np
 import tensorflow as tf
 
+def to_xy(j, k):
+    return (k - 13, -j + 14)
+
+
+def to_jk(x, y):
+    return (-y + 14, x + 13)
+
+
+def image_value(image, x, y):
+    j, k = to_jk(x, y)
+    return image[int(j)][int(k)][0]
+
+def rotate(image):
+    rot_image = copy.deepcopy(image)
+    theta = 45 * np.pi / 180
+
+    for j in range(28):
+        for k in range(28):
+            x, y = to_xy(j, k)
+            x1 = np.cos(theta) * x + np.sin(theta) * y
+            y1 = -np.sin(theta) * x + np.cos(theta) * y
+            x2 = np.floor(x1)
+            delta_x = x1 - x2
+            y2 = np.floor(y1)
+            delta_y = y1 - y2
+            if x2 < -13 or x2 > 13 or y2 < -13 or y2 > 13: continue
+            value \
+                    = (1 - delta_x) * (1 - delta_y) * image_value(image, x2, y2) + \
+                      (1 - delta_x) * delta_y * image_value(image, x2, y2 + 1) + \
+                      delta_x * (1 - delta_y) * image_value(image, x2 + 1, y2) + \
+                      delta_x * delta_y * image_value(image, x2 + 1, y2 + 1)
+            rot_image[int(j)][int(k)][0] = 1.3 * value
+    return rot_image
 
 def load_data(batch_size, is_training=True):
     path = os.path.join('data', 'mnist')
@@ -29,6 +64,13 @@ def load_data(batch_size, is_training=True):
         fd = open(os.path.join(path, 't10k-images-idx3-ubyte'))
         loaded = np.fromfile(file=fd, dtype=np.uint8)
         teX = loaded[16:].reshape((10000, 28, 28, 1)).astype(np.float)
+
+        for k in range(0, 10000):
+            elem = teX[k]
+            # cv2.imwrite(os.path.join('images', '%05d-real.png' % (k,)), elem)
+            elem1 = rotate(elem)
+            teX[k] = elem1
+            # cv2.imwrite(os.path.join('images', '%05d-modified.png' % (k,)), elem1)
 
         fd = open(os.path.join(path, 't10k-labels-idx1-ubyte'))
         loaded = np.fromfile(file=fd, dtype=np.uint8)
